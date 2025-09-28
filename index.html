@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chinese Audio Player</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin: 0;
+        padding: 20px;
+        background: #f9f9f9;
+      }
+      .controls {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        background: #4caf50;
+        color: white;
+        cursor: pointer;
+      }
+      .text-box {
+        margin-top: 20px;
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        max-width: 400px;
+        margin: auto;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      .word {
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+      .word:hover {
+        background: #e6f7ff;
+      }
+      .tooltip {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #333;
+        background: #f0f0f0;
+        padding: 8px;
+        border-radius: 6px;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🎧 Từ vựng tiếng Trung HSK 1</h2>
+
+    <audio id="audioPlayer" controls></audio>
+
+    <div class="controls">
+      <button onclick="prevAudio()">⏮ Trước</button>
+      <button onclick="togglePlay()">▶️ / ⏸</button>
+      <button onclick="nextAudio()">⏭ Tiếp</button>
+    </div>
+
+    <div class="text-box" id="lessonText"></div>
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+      const lessons = [
+        {
+          audio: "./audio/audio1.mp3",
+          chinese: "我 是 学生",
+          pinyin: "Wǒ shì xuéshēng.",
+          vietnamese: "Tôi là học sinh / sinh viên.",
+          words: {
+            我: { meaning: "tôi", audio: "./audio/Wǒ.mp3" },
+            是: { meaning: "là", audio: "./audio/shì.mp3" },
+            学生: {
+              meaning: "học sinh,sinh viên",
+              audio: "./audio/xuéshēng.mp3",
+            },
+          },
+        },
+        {
+          audio: "./audio/audio2.mp3",
+          chinese: "我们 去 学校",
+          pinyin: "Wǒmen qù xuéxiào.",
+          vietnamese: "Chúng tôi đi đến trường.",
+          words: {
+            我们: { meaning: "chúng tôi", audio: "./audio/Wǒmen.mp3" },
+            去: { meaning: "đi", audio: "./audio/qù.mp3" },
+            学校: { meaning: "trường học", audio: "./audio/xuéxiào.mp3" },
+          },
+        },
+        {
+          audio: "./audio/audio3.mp3",
+          chinese: "你 叫 什么 ？",
+          pinyin: "Nǐ jiào shénme?",
+          vietnamese: "Bạn tên là gì?",
+          words: {
+            你: { meaning: "bạn", audio: "./audio/nǐ.mp3" },
+            叫: { meaning: "gọi,tên là", audio: "./audio/jiào.mp3" },
+            什么: { meaning: "gì", audio: "./audio/shénme.mp3" },
+          },
+        },
+      ];
+
+      let currentIndex = 0;
+      const audioPlayer = document.getElementById("audioPlayer");
+      const lessonText = document.getElementById("lessonText");
+      const tooltip = document.getElementById("tooltip");
+      let wordAudio = new Audio();
+
+      function loadAudio(index) {
+        audioPlayer.src = lessons[index].audio;
+        audioPlayer.play();
+        renderText(index);
+      }
+
+      function renderText(index) {
+        const lesson = lessons[index];
+        let chineseWords = lesson.chinese
+          .split(" ")
+          .map((w) => {
+            return `<span class="word" onclick="showMeaning('${w}')">${w}</span>`;
+          })
+          .join(" ");
+
+        lessonText.innerHTML = `
+        <b>中文:</b> ${chineseWords}<br>
+        <b>Pinyin:</b> ${lesson.pinyin}<br>
+        <b>Tiếng Việt:</b> ${lesson.vietnamese}
+      `;
+        tooltip.style.display = "none";
+      }
+
+      function showMeaning(word) {
+        const lesson = lessons[currentIndex];
+        if (lesson.words[word]) {
+          tooltip.innerHTML = `<b>${word}</b>: ${lesson.words[word].meaning}`;
+          tooltip.style.display = "block";
+
+          // phát âm thanh từ
+          wordAudio.src = lesson.words[word].audio;
+          wordAudio.play();
+        } else {
+          tooltip.innerHTML = `<b>${word}</b>: Chưa có nghĩa`;
+          tooltip.style.display = "block";
+        }
+      }
+
+      function togglePlay() {
+        if (audioPlayer.paused) audioPlayer.play();
+        else audioPlayer.pause();
+      }
+
+      function nextAudio() {
+        currentIndex = (currentIndex + 1) % lessons.length;
+        loadAudio(currentIndex);
+      }
+
+      function prevAudio() {
+        currentIndex = (currentIndex - 1 + lessons.length) % lessons.length;
+        loadAudio(currentIndex);
+      }
+
+      // load đầu tiên
+      loadAudio(currentIndex);
+    </script>
+  </body>
+</html>
