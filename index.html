@@ -3,28 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chinese Audio Player</title>
+    <title>Chinese TTS Player</title>
+    <script src="https://unpkg.com/pinyin-pro"></script>
     <style>
       body {
         font-family: Arial, sans-serif;
         text-align: center;
-        margin: 0;
         padding: 20px;
         background: #f9f9f9;
       }
       .controls {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        flex-wrap: wrap;
+        margin: 15px 0;
       }
       button {
-        padding: 10px;
+        padding: 8px 12px;
         border: none;
         border-radius: 6px;
         background: #4caf50;
         color: white;
         cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #45a049;
       }
       .text-box {
         margin-top: 20px;
@@ -52,80 +53,114 @@
         border-radius: 6px;
         display: none;
       }
+
+      .form-box {
+        margin-top: 30px;
+        padding: 15px;
+        background: #fff;
+        border-radius: 10px;
+        max-width: 400px;
+        margin: auto;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      input {
+        width: 100%;
+        padding: 8px;
+        margin: 5px 0;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+
+      .lesson-list {
+        margin-top: 30px;
+        text-align: left;
+        max-width: 500px;
+        margin: auto;
+      }
+      .lesson-item {
+        background: #fff;
+        margin: 5px 0;
+        padding: 8px;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .lesson-text {
+        cursor: pointer;
+        flex: 1;
+      }
+      .delete-btn {
+        background: red;
+        color: white;
+        border: none;
+        padding: 5px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .delete-btn:hover {
+        background: darkred;
+      }
     </style>
   </head>
   <body>
-    <h2>🎧 Từ vựng tiếng Trung HSK 1</h2>
-
-    <audio id="audioPlayer" controls></audio>
+    <h2>🎧 Luyện nghe tiếng Trung (TTS)</h2>
 
     <div class="controls">
-      <button onclick="prevAudio()">⏮ Trước</button>
+      <button onclick="prevSentence()">⏮ Trước</button>
       <button onclick="togglePlay()">▶️ / ⏸</button>
-      <button onclick="nextAudio()">⏭ Tiếp</button>
+      <button onclick="nextSentence()">⏭ Tiếp</button>
     </div>
 
     <div class="text-box" id="lessonText"></div>
     <div class="tooltip" id="tooltip"></div>
 
+    <!-- Form thêm câu mới -->
+    <div class="form-box">
+      <h3>➕ Thêm câu mới</h3>
+      <input
+        type="text"
+        id="chineseInput"
+        placeholder="Câu tiếng Trung (vd: 你好)"
+      />
+      <button onclick="addLesson()">Thêm câu</button>
+    </div>
+
+    <!-- Danh sách câu -->
+    <div class="lesson-list">
+      <h3>📚 Danh sách câu đã lưu</h3>
+      <div id="lessonItems"></div>
+    </div>
+
     <script>
-      const lessons = [
+      let lessons = JSON.parse(localStorage.getItem("lessons_tts")) || [
         {
-          audio: "./audio/audio1.mp3",
-          chinese: "我 是 学生",
-          pinyin: "Wǒ shì xuéshēng.",
-          vietnamese: "Tôi là học sinh / sinh viên.",
-          words: {
-            我: { meaning: "tôi", audio: "./audio/wǒ.mp3" },
-            是: { meaning: "là", audio: "./audio/shì.mp3" },
-            学生: {
-              meaning: "học sinh,sinh viên",
-              audio: "./audio/xuéshēng.mp3",
-            },
-          },
-        },
-        {
-          audio: "./audio/audio2.mp3",
-          chinese: "我们 去 学校",
-          pinyin: "Wǒmen qù xuéxiào.",
-          vietnamese: "Chúng tôi đi đến trường.",
-          words: {
-            我们: { meaning: "chúng tôi", audio: "./audio/Wǒmen.mp3" },
-            去: { meaning: "đi", audio: "./audio/qù.mp3" },
-            学校: { meaning: "trường học", audio: "./audio/xuéxiào.mp3" },
-          },
-        },
-        {
-          audio: "./audio/audio3.mp3",
-          chinese: "你 叫 什么 ？",
-          pinyin: "Nǐ jiào shénme?",
+          chinese: "你叫什么名字？",
+          pinyin: "Nǐ jiào shénme míngzì?",
           vietnamese: "Bạn tên là gì?",
-          words: {
-            你: { meaning: "bạn", audio: "./audio/nǐ.mp3" },
-            叫: { meaning: "gọi,tên là", audio: "./audio/jiào.mp3" },
-            什么: { meaning: "gì", audio: "./audio/shénme.mp3" },
-          },
+        },
+        {
+          chinese: "你明天去学校吗？",
+          pinyin: "Nǐ míngtiān qù xuéxiào ma?",
+          vietnamese: "Ngày mai bạn đi học không?",
         },
       ];
 
       let currentIndex = 0;
-      const audioPlayer = document.getElementById("audioPlayer");
+      let isPlaying = false;
+      let synth = window.speechSynthesis;
+
       const lessonText = document.getElementById("lessonText");
       const tooltip = document.getElementById("tooltip");
-      let wordAudio = new Audio();
-
-      function loadAudio(index) {
-        audioPlayer.src = lessons[index].audio;
-        audioPlayer.play();
-        renderText(index);
-      }
+      const lessonItems = document.getElementById("lessonItems");
 
       function renderText(index) {
         const lesson = lessons[index];
         let chineseWords = lesson.chinese
-          .split(" ")
+          .split("")
           .map((w) => {
-            return `<span class="word" onclick="showMeaning('${w}')">${w}</span>`;
+            return `<span class="word" onclick="speakWord('${w}')">${w}</span>`;
           })
           .join(" ");
 
@@ -137,38 +172,108 @@
         tooltip.style.display = "none";
       }
 
-      function showMeaning(word) {
-        const lesson = lessons[currentIndex];
-        if (lesson.words[word]) {
-          tooltip.innerHTML = `<b>${word}</b>: ${lesson.words[word].meaning}`;
-          tooltip.style.display = "block";
+      function speakSentence(text) {
+        if (synth.speaking) synth.cancel();
+        let utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "zh-CN";
+        utterance.rate = 1;
+        utterance.onend = () => {
+          isPlaying = false;
+        };
+        synth.speak(utterance);
+        isPlaying = true;
+      }
 
-          // phát âm thanh từ
-          wordAudio.src = lesson.words[word].audio;
-          wordAudio.play();
-        } else {
-          tooltip.innerHTML = `<b>${word}</b>: Chưa có nghĩa`;
-          tooltip.style.display = "block";
-        }
+      function speakWord(word) {
+        if (synth.speaking) synth.cancel();
+        let utterance = new SpeechSynthesisUtterance(word);
+        utterance.lang = "zh-CN";
+        synth.speak(utterance);
       }
 
       function togglePlay() {
-        if (audioPlayer.paused) audioPlayer.play();
-        else audioPlayer.pause();
+        if (isPlaying) {
+          synth.cancel();
+          isPlaying = false;
+        } else {
+          speakSentence(lessons[currentIndex].chinese);
+        }
       }
 
-      function nextAudio() {
+      function nextSentence() {
         currentIndex = (currentIndex + 1) % lessons.length;
-        loadAudio(currentIndex);
+        renderText(currentIndex);
       }
 
-      function prevAudio() {
+      function prevSentence() {
         currentIndex = (currentIndex - 1 + lessons.length) % lessons.length;
-        loadAudio(currentIndex);
+        renderText(currentIndex);
       }
 
-      // load đầu tiên
-      loadAudio(currentIndex);
+      async function addLesson() {
+        const chinese = document.getElementById("chineseInput").value.trim();
+        if (!chinese) return;
+
+        // dịch sang tiếng Việt
+        const res = await fetch("https://libretranslate.de/translate", {
+          method: "POST",
+          body: JSON.stringify({
+            q: chinese,
+            source: "zh",
+            target: "vi",
+            format: "text",
+          }),
+          headers: { "Content-Type": "application/json" },
+        });
+        const data = await res.json();
+        const vietnamese = data.translatedText;
+
+        const pinyin = window.pinyinPro.pinyin(chinese, { toneType: "tone" });
+
+        lessons.push({ chinese, pinyin, vietnamese });
+        localStorage.setItem("lessons_tts", JSON.stringify(lessons));
+        renderLessonList();
+        alert("✅ Đã thêm câu mới!");
+        document.getElementById("chineseInput").value = "";
+      }
+
+      function renderLessonList() {
+        lessonItems.innerHTML = "";
+        lessons.forEach((lesson, index) => {
+          const div = document.createElement("div");
+          div.className = "lesson-item";
+          div.innerHTML = `
+          <span class="lesson-text" onclick="selectLesson(${index})">${lesson.chinese} (${lesson.vietnamese})</span>
+          <button class="delete-btn" onclick="deleteLesson(${index})">❌</button>
+        `;
+          lessonItems.appendChild(div);
+        });
+      }
+
+      function selectLesson(index) {
+        currentIndex = index;
+        renderText(currentIndex);
+      }
+
+      function deleteLesson(index) {
+        if (confirm("Bạn có chắc muốn xóa câu này không?")) {
+          lessons.splice(index, 1);
+          localStorage.setItem("lessons_tts", JSON.stringify(lessons));
+          renderLessonList();
+          if (lessons.length > 0) {
+            currentIndex = 0;
+            renderText(currentIndex);
+          } else {
+            lessonText.innerHTML = "📭 Danh sách trống. Hãy thêm câu mới!";
+          }
+        }
+      }
+
+      // Load đầu tiên
+      renderLessonList();
+      if (lessons.length > 0) {
+        renderText(currentIndex);
+      }
     </script>
   </body>
 </html>
