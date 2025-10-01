@@ -124,6 +124,11 @@
         id="chineseInput"
         placeholder="Câu tiếng Trung (vd: 你好)"
       />
+      <input
+        type="text"
+        id="vietnameseInput"
+        placeholder="Nghĩa tiếng Việt (vd: Xin chào)"
+      />
       <button onclick="addLesson()">Thêm câu</button>
     </div>
 
@@ -147,6 +152,18 @@
         },
       ];
 
+      // 📘 Dictionary (ưu tiên cụm từ dài trước)
+      const dictionary = {
+        你: "bạn",
+        叫: "gọi, tên là",
+        什么: "cái gì",
+        名字: "tên",
+        明天: "ngày mai",
+        去: "đi",
+        学校: "trường học",
+        吗: "từ nghi vấn",
+      };
+
       let currentIndex = 0;
       let isPlaying = false;
       let synth = window.speechSynthesis;
@@ -155,12 +172,38 @@
       const tooltip = document.getElementById("tooltip");
       const lessonItems = document.getElementById("lessonItems");
 
+      // Hàm tách câu theo từ trong dictionary
+      function segmentSentence(sentence) {
+        let words = [];
+        let i = 0;
+        while (i < sentence.length) {
+          let found = false;
+          // thử tìm cụm dài nhất trong dictionary
+          for (let len = 3; len > 0; len--) {
+            let part = sentence.substr(i, len);
+            if (dictionary[part]) {
+              words.push(part);
+              i += len;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            words.push(sentence[i]); // ký tự lẻ chưa có trong dict
+            i++;
+          }
+        }
+        return words;
+      }
+
       function renderText(index) {
         const lesson = lessons[index];
-        let chineseWords = lesson.chinese
-          .split("")
+        let words = segmentSentence(lesson.chinese);
+
+        let chineseWords = words
           .map((w) => {
-            return `<span class="word" onclick="speakWord('${w}')">${w}</span>`;
+            if (w.trim() === "") return "";
+            return `<span class="word" onclick="showWord('${w}')">${w}</span>`;
           })
           .join(" ");
 
@@ -184,11 +227,15 @@
         isPlaying = true;
       }
 
-      function speakWord(word) {
+      function showWord(word) {
         if (synth.speaking) synth.cancel();
         let utterance = new SpeechSynthesisUtterance(word);
         utterance.lang = "zh-CN";
         synth.speak(utterance);
+
+        let meaning = dictionary[word] || "Chưa có nghĩa";
+        tooltip.innerHTML = `<b>${word}</b>: ${meaning}`;
+        tooltip.style.display = "block";
       }
 
       function togglePlay() {
@@ -210,23 +257,15 @@
         renderText(currentIndex);
       }
 
-      async function addLesson() {
+      function addLesson() {
         const chinese = document.getElementById("chineseInput").value.trim();
-        if (!chinese) return;
-
-        // dịch sang tiếng Việt
-        const res = await fetch("https://libretranslate.de/translate", {
-          method: "POST",
-          body: JSON.stringify({
-            q: chinese,
-            source: "zh",
-            target: "vi",
-            format: "text",
-          }),
-          headers: { "Content-Type": "application/json" },
-        });
-        const data = await res.json();
-        const vietnamese = data.translatedText;
+        const vietnamese = document
+          .getElementById("vietnameseInput")
+          .value.trim();
+        if (!chinese || !vietnamese) {
+          alert("❌ Vui lòng nhập cả câu tiếng Trung và nghĩa tiếng Việt!");
+          return;
+        }
 
         const pinyin = window.pinyinPro.pinyin(chinese, { toneType: "tone" });
 
@@ -235,6 +274,7 @@
         renderLessonList();
         alert("✅ Đã thêm câu mới!");
         document.getElementById("chineseInput").value = "";
+        document.getElementById("vietnameseInput").value = "";
       }
 
       function renderLessonList() {
@@ -269,7 +309,7 @@
         }
       }
 
-      // Load đầu tiên
+      // Load lần đầu
       renderLessonList();
       if (lessons.length > 0) {
         renderText(currentIndex);
